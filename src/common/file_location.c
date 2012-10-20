@@ -96,7 +96,7 @@ static gchar * dt_loc_init_generic (const char *value,const char*default_value)
   }
 }
 
-void dt_loc_init_user_config_dir (const char *configdir)
+int dt_loc_init_user_config_dir (const char *configdir)
 {
   gchar *xdg_config_dir = NULL;
   gchar *default_config_dir = NULL;
@@ -114,8 +114,12 @@ void dt_loc_init_user_config_dir (const char *configdir)
   }
 
   darktable.configdir = dt_loc_init_generic(configdir, xdg_config_dir?xdg_config_dir:default_config_dir);
+  if(darktable.configdir == NULL) return 1;
+
   g_free(xdg_config_dir);
   g_free(default_config_dir);
+
+  return 0;
 }
 
 #if defined(__MACH__) || defined(__APPLE__)
@@ -160,7 +164,7 @@ int dt_loc_init_tmp_dir (const char *tmpdir)
   if(darktable.tmpdir == NULL)return 1;
   return 0;
 }
-void dt_loc_init_user_cache_dir (const char *cachedir)
+int dt_loc_init_user_cache_dir (const char *cachedir)
 {
   gchar *xdg_cache_dir = NULL;
   const char* xdg_cache_home = g_getenv("XDG_CACHE_HOME");
@@ -168,9 +172,12 @@ void dt_loc_init_user_cache_dir (const char *cachedir)
     xdg_cache_dir = g_strconcat(xdg_cache_home, "/darktable", NULL);
   darktable.cachedir = dt_loc_init_generic(cachedir,xdg_cache_dir?xdg_cache_dir:DARKTABLE_CACHEDIR);
   g_free(xdg_cache_dir);
+
+  if(darktable.cachedir == NULL) return 1;
+  return 0;
 }
 
-void dt_loc_init_plugindir(const char *plugindir)
+int dt_loc_init_plugindir(const char *plugindir)
 {
 #if defined(__MACH__) || defined(__APPLE__)
   char*directory = find_install_dir("/lib/darktable");
@@ -185,9 +192,12 @@ void dt_loc_init_plugindir(const char *plugindir)
 #else
   darktable.plugindir = dt_loc_init_generic(plugindir,DARKTABLE_LIBDIR);
 #endif
+
+  if(darktable.plugindir == NULL) return 1;
+  return 0;
 }
 
-void dt_loc_init_datadir(const char *datadir)
+int dt_loc_init_datadir(const char *datadir)
 {
 #if defined(__MACH__) || defined(__APPLE__)
   char*directory = find_install_dir("/share/darktable");
@@ -202,6 +212,9 @@ void dt_loc_init_datadir(const char *datadir)
 #else
   darktable.datadir = dt_loc_init_generic(datadir,DARKTABLE_DATADIR);
 #endif
+
+  if (darktable.datadir == NULL) return 1;
+  return 0;
 }
 
 

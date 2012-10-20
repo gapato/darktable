@@ -462,6 +462,7 @@ int dt_init(int argc, char *argv[], const int init_gui)
       }
       else if(!strcmp(argv[k], "--localedir"))
       {
+        // FIXME: check that directory exists
         bindtextdomain (GETTEXT_PACKAGE, argv[++k]);
       }
       else if(argv[k][1] == 'd' && argc > k+1)
@@ -502,15 +503,31 @@ int dt_init(int argc, char *argv[], const int init_gui)
 #ifdef _OPENMP
   omp_set_num_threads(darktable.num_openmp_threads);
 #endif
-  dt_loc_init_datadir(datadirFromCommand);
-  dt_loc_init_plugindir(moduledirFromCommand);
-  if(dt_loc_init_tmp_dir(tmpdirFromCommand))
+  if(dt_loc_init_datadir(datadirFromCommand))
   {
-    printf(_("ERROR : invalid temporary directory : %s\n"),darktable.tmpdir);
+    fprintf(stderr, "error with data directory (inexistent?): %s\n", datadirFromCommand);
     return usage(argv[0]);
   }
-  dt_loc_init_user_config_dir(configdirFromCommand);
-  dt_loc_init_user_cache_dir(cachedirFromCommand);
+  if(dt_loc_init_plugindir(moduledirFromCommand))
+  {
+    fprintf(stderr, "error with module directory (inexistent?): %s\n", moduledirFromCommand);
+    return usage(argv[0]);
+  }
+  if(dt_loc_init_tmp_dir(tmpdirFromCommand))
+  {
+    fprintf(stderr, "error with temporary directory (inexistent?): %s\n", tmpdirFromCommand);
+    return usage(argv[0]);
+  }
+  if(dt_loc_init_user_config_dir(configdirFromCommand))
+  {
+    fprintf(stderr, "error with config directory (inexistent?): %s\n", configdirFromCommand);
+    return usage(argv[0]);
+  }
+  if(dt_loc_init_user_cache_dir(cachedirFromCommand))
+  {
+    fprintf(stderr, "error with cache directory (inexistent?): %s\n", cachedirFromCommand);
+    return usage(argv[0]);
+  }
 
   g_type_init();
 
