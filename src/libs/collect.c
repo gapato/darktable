@@ -93,6 +93,7 @@ typedef enum dt_lib_collect_cols_t
   DT_LIB_COLLECT_COL_PATH,
   DT_LIB_COLLECT_COL_COUNT,
   DT_LIB_COLLECT_COL_VISIBLE,
+  DT_LIB_COLLECT_COL_NOMATCH,
   DT_LIB_COLLECT_NUM_COLS
 }
 dt_lib_collect_cols_t;
@@ -668,7 +669,13 @@ _folder_tree ()
   sqlite3_stmt *stmt;
 //  DT_DEBUG_SQLITE3_PREPARE_V2(dt_database_get(darktable.db), "select folder,external_drive from film_rolls order by folder desc", -1, &stmt, NULL);
   DT_DEBUG_SQLITE3_PREPARE_V2(dt_database_get(darktable.db), "select folder from film_rolls order by folder desc", -1, &stmt, NULL);
-  GtkTreeStore *store = gtk_tree_store_new(DT_LIB_COLLECT_NUM_COLS, G_TYPE_STRING, G_TYPE_UINT, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_INT, G_TYPE_BOOLEAN);
+  GtkTreeStore *store = gtk_tree_store_new(DT_LIB_COLLECT_NUM_COLS-1, // -1 match is not implemented yet
+                                           G_TYPE_STRING,    // text
+                                           G_TYPE_UINT,      // id
+                                           G_TYPE_STRING,    // tooltip
+                                           G_TYPE_STRING,    // path
+                                           G_TYPE_INT,       // count
+                                           G_TYPE_BOOLEAN);  // visible
 
   // initialize the model with the paths
 
@@ -1108,13 +1115,19 @@ list_view (dt_lib_collect_rule_t *dr)
   switch(property)
   {
     case DT_COLLECTION_PROP_FILMROLL: // film roll
-      snprintf(query, 1024, "select distinct folder, id from film_rolls where folder like '%%%s%%'  order by folder desc", escaped_text);
+      snprintf(query, 1024,
+                "SELECT DISTINCT folder, id, folder LIKE '%%%s%%' AS match FROM film_rolls ORDER BY match DESC, folder DESC",
+                escaped_text);
       break;
     case DT_COLLECTION_PROP_CAMERA: // camera
-      snprintf(query, 1024, "select distinct maker || ' ' || model as model, 1 from images where maker || ' ' || model like '%%%s%%' order by model", escaped_text);
+      snprintf(query, 1024,
+                "SELECT DISTINCT maker || ' ' || model AS model, 1, maker || ' ' || model LIKE '%%%s%%' AS match FROM images ORDER BY match DESC, model",
+                escaped_text);
       break;
     case DT_COLLECTION_PROP_TAG: // tag
-      snprintf(query, 1024, "SELECT distinct name, id FROM tags WHERE name LIKE '%%%s%%' ORDER BY UPPER(name)", escaped_text);
+      snprintf(query, 1024,
+                "SELECT DISTINCT name, id, name LIKE '%%%s%%' AS match FROM tags ORDER BY match DESC, UPPER(name)",
+                escaped_text);
       break;
     case DT_COLLECTION_PROP_HISTORY: // History, 2 hardcoded alternatives
       gtk_list_store_append(GTK_LIST_STORE(listmodel), &iter);
@@ -1169,36 +1182,49 @@ list_view (dt_lib_collect_rule_t *dr)
       // TODO: Add empty string for metadata?
       // TODO: Autogenerate this code?
     case DT_COLLECTION_PROP_TITLE: // title
-      snprintf(query, 1024, "select distinct value, 1 from meta_data where key = %d and value like '%%%s%%' order by value",
-               DT_METADATA_XMP_DC_TITLE, escaped_text);
+      snprintf(query, 1024,
+                "SELECT DISTINCT value, 1, KEY = %d AND VALUE LIKE '%%%s%%' AS match FROM meta_data ORDER BY match DESC, value",
+                DT_METADATA_XMP_DC_TITLE, escaped_text);
       break;
     case DT_COLLECTION_PROP_DESCRIPTION: // description
-      snprintf(query, 1024, "select distinct value, 1 from meta_data where key = %d and value like '%%%s%%' order by value",
-               DT_METADATA_XMP_DC_DESCRIPTION, escaped_text);
+      snprintf(query, 1024,
+                "SELECT DISTINCT value, 1, KEY = %d AND VALUE LIKE '%%%s%%' AS match FROM meta_data ORDER BY match DESC, value",
+                DT_METADATA_XMP_DC_DESCRIPTION, escaped_text);
       break;
     case DT_COLLECTION_PROP_CREATOR: // creator
-      snprintf(query, 1024, "select distinct value, 1 from meta_data where key = %d and value like '%%%s%%' order by value",
-               DT_METADATA_XMP_DC_CREATOR, escaped_text);
+      snprintf(query, 1024,
+                "SELECT DISTINCT value, 1, KEY = %d AND VALUE LIKE '%%%s%%' AS match FROM meta_data ORDER BY match DESC, value",
+                DT_METADATA_XMP_DC_CREATOR, escaped_text);
       break;
     case DT_COLLECTION_PROP_PUBLISHER: // publisher
-      snprintf(query, 1024, "select distinct value, 1 from meta_data where key = %d and value like '%%%s%%' order by value",
-               DT_METADATA_XMP_DC_PUBLISHER, escaped_text);
+      snprintf(query, 1024,
+                "SELECT DISTINCT value, 1, KEY = %d AND VALUE LIKE '%%%s%%' AS match FROM meta_data ORDER BY match DESC, value",
+                DT_METADATA_XMP_DC_PUBLISHER, escaped_text);
       break;
     case DT_COLLECTION_PROP_RIGHTS: // rights
-      snprintf(query, 1024, "select distinct value, 1 from meta_data where key = %d and value like '%%%s%%'order by value ",
-               DT_METADATA_XMP_DC_RIGHTS, escaped_text);
+      snprintf(query, 1024,
+                "SELECT DISTINCT value, 1, KEY = %d AND VALUE LIKE '%%%s%%' AS match FROM meta_data ORDER BY match DESC, value",
+                DT_METADATA_XMP_DC_RIGHTS, escaped_text);
       break;
     case DT_COLLECTION_PROP_LENS: // lens
-      snprintf(query, 1024, "select distinct lens, 1 from images where lens like '%%%s%%' order by lens", escaped_text);
+      snprintf(query, 1024,
+                "SELECT DISTINCT lens, 1, len LIKE '%%%s%%' AS match FROM images ORDER BY match DESC, lens",
+                escaped_text);
       break;
     case DT_COLLECTION_PROP_ISO: // iso
-      snprintf(query, 1024, "select distinct cast(iso as integer) as iso, 1 from images where iso like '%%%s%%' order by iso", escaped_text);
+      snprintf(query, 1024,
+                "SELECT DISTINCT CAST(iso AS INTEGER) AS iso, 1, iso LIKE '%%%s%%' AS match FROM images ORDER BY match DESC, iso",
+                escaped_text);
       break;
     case DT_COLLECTION_PROP_APERTURE: // aperture
-      snprintf(query, 1024, "select distinct round(aperture,1) as aperture, 1 from images where aperture like '%%%s%%' order by aperture", escaped_text);
+      snprintf(query, 1024,
+                "SELECT DISTINCT ROUND(aperture,1) AS aperture, 1, aperture LIKE '%%%s%%' AS match FROM images ORDER BY match DESC, aperture",
+                escaped_text);
       break;
     case DT_COLLECTION_PROP_FILENAME: // filename
-      snprintf(query, 1024, "select distinct filename, 1 from images where filename like '%%%s%%' order by filename", escaped_text);
+      snprintf(query, 1024,
+                "SELECT DISTINCT filename, 1, filename LIKE '%%%s%%' AS match from images ORDER BY match DESC, filename",
+                escaped_text);
       break;
 
     case DT_COLLECTION_PROP_FOLDERS: // folders
@@ -1206,7 +1232,9 @@ list_view (dt_lib_collect_rule_t *dr)
       break;
 
     default: // case 3: // day
-      snprintf(query, 1024, "SELECT DISTINCT datetime_taken, 1 FROM images WHERE datetime_taken LIKE '%%%s%%' ORDER BY datetime_taken DESC", escaped_text);
+      snprintf(query, 1024,
+                "SELECT DISTINCT datetime_taken, 1, datetime_taken LIKE '%%%s%%' AS match FROM images ORDER BY match DESC, datetime_taken DESC",
+                escaped_text);
       break;
   }
   g_free(escaped_text);
@@ -1216,17 +1244,19 @@ list_view (dt_lib_collect_rule_t *dr)
   {
     gtk_list_store_append(GTK_LIST_STORE(listmodel), &iter);
     const char *folder = (const char*)sqlite3_column_text(stmt, 0);
-    if(property == 0) // film roll
+    if(property == DT_COLLECTION_PROP_FILMROLL)
     {
       folder = dt_image_film_roll_name(folder);
     }
     gchar *value =  (gchar *)sqlite3_column_text(stmt, 0);
+    gboolean match = (gboolean)sqlite3_column_int(stmt, 2);
     gchar *escaped_text = g_markup_escape_text(value, strlen(value));
     gtk_list_store_set (GTK_LIST_STORE(listmodel), &iter,
                         DT_LIB_COLLECT_COL_TEXT, folder,
                         DT_LIB_COLLECT_COL_ID, sqlite3_column_int(stmt, 1),
                         DT_LIB_COLLECT_COL_TOOLTIP, escaped_text,
                         DT_LIB_COLLECT_COL_PATH, value,
+                        DT_LIB_COLLECT_COL_NOMATCH, !match,
                         -1);
   }
   sqlite3_finalize(stmt);
@@ -1895,11 +1925,26 @@ gui_init (dt_lib_module_t *self)
   
   GtkTreeViewColumn *col = gtk_tree_view_column_new();
   gtk_tree_view_append_column(view, col);
+
+  GdkColor faint_grey;
+  faint_grey.red   = 20000.0;
+  faint_grey.green = 20000.0;
+  faint_grey.blue  = 20000.0;
+
   GtkCellRenderer *renderer = gtk_cell_renderer_text_new();
+  g_object_set(renderer, "foreground-gdk", &faint_grey, NULL);
   gtk_tree_view_column_pack_start(col, renderer, TRUE);
   gtk_tree_view_column_add_attribute(col, renderer, "text", DT_LIB_COLLECT_COL_TEXT);
+  gtk_tree_view_column_add_attribute(col, renderer, "foreground-set", DT_LIB_COLLECT_COL_NOMATCH);
 
-  GtkTreeModel *listmodel = GTK_TREE_MODEL(gtk_list_store_new(DT_LIB_COLLECT_NUM_COLS, G_TYPE_STRING, G_TYPE_UINT, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_UINT, G_TYPE_BOOLEAN));
+  GtkTreeModel *listmodel = GTK_TREE_MODEL(gtk_list_store_new(DT_LIB_COLLECT_NUM_COLS,
+                                                              G_TYPE_STRING,    // text
+                                                              G_TYPE_UINT,      // id
+                                                              G_TYPE_STRING,    // tooltip
+                                                              G_TYPE_STRING,    // path
+                                                              G_TYPE_UINT,      // count
+                                                              G_TYPE_BOOLEAN,   // visible
+                                                              G_TYPE_BOOLEAN)); // nomatch
   d->listmodel = listmodel;
   
   gtk_box_pack_start(GTK_BOX(self->widget), GTK_WIDGET(sw), TRUE, TRUE, 0);
